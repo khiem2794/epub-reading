@@ -223,14 +223,44 @@ function App() {
     }
   }, [destroyBook])
 
+  const scrollToFragment = useCallback((fragmentId: string) => {
+    const mount = viewerRef.current
+
+    if (!mount) {
+      return false
+    }
+
+    const escapedFragmentId = typeof CSS.escape === 'function'
+      ? CSS.escape(fragmentId)
+      : fragmentId
+
+    const directMatch = mount.querySelector(`#${escapedFragmentId}`)
+    const attributeMatch = mount.querySelector(`[id="${fragmentId.replaceAll('"', '\\"')}"]`)
+    const namedMatch = mount.querySelector(`[name="${fragmentId.replaceAll('"', '\\"')}"]`)
+    const sectionElement = (directMatch || attributeMatch || namedMatch) as HTMLElement | null
+
+    if (!sectionElement) {
+      return false
+    }
+
+    const nextTop = window.scrollY + sectionElement.getBoundingClientRect().top - 12
+    window.scrollTo({ top: Math.max(0, nextTop), behavior: 'auto' })
+
+    return true
+  }, [])
+
   const renderChapter = useCallback(
-    async (href: string, chapterKey?: string, fragmentId?: string) => {
+    async (href: string, chapterKey?: string, fragmentId?: string): Promise<boolean> => {
       if (!bookRef.current || !viewerRef.current) {
-        return
+        return false
       }
 
       const targetBook = bookRef.current
       const targetSection = targetBook.section(href)
+
+      if (!targetSection) {
+        return false
+      }
 
       setErrorMessage('')
       setIsLoading(true)
@@ -242,16 +272,20 @@ function App() {
 
         if (!viewerRef.current || targetBook !== bookRef.current) {
           targetSection.unload()
-          return
+          return false
         }
 
-        const parsedDocument = new DOMParser().parseFromString(renderedMarkup, 'text/html')
-
-        viewerRef.current.innerHTML = `<article class="reader-inline-root">${parsedDocument.body.innerHTML}</article>`
+        // const parsedDocument = new DOMParser().parseFromString(renderedMarkup, 'text/html')
+        viewerRef.current.innerHTML = `<article class="reader-inline-root">${renderedMarkup}</article>`
 
         const article = viewerRef.current.querySelector('.reader-inline-root') as HTMLElement
         rewriteInternalLinks(article, targetSection.href || href)
         await rewriteResources(article, targetBook, targetSection.url || href)
+        const preTags = article.querySelectorAll('pre')
+        
+        preTags.forEach((pre) => {
+          pre.setAttribute('aria-hidden', 'true')
+        })
 
         activeSectionRef.current?.unload()
         activeSectionRef.current = targetSection
@@ -260,24 +294,28 @@ function App() {
           setSelectedKey(chapterKey)
         }
 
-        if (fragmentId) {
-          requestAnimationFrame(() => {
-            const element = viewerRef.current?.querySelector(`#${CSS.escape(fragmentId)}`)
-            element?.scrollIntoView({ block: 'start' })
-          })
-        }
+        requestAnimationFrame(() => {
+          if (fragmentId && scrollToFragment(fragmentId)) {
+            return
+          }
+
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+        })
+
+        return true
       } catch (error) {
         targetSection.unload()
         setErrorMessage(
           error instanceof Error ? error.message : 'Unable to render this chapter. Please try another one.',
         )
+        return false
       } finally {
         if (targetBook === bookRef.current) {
           setIsLoading(false)
         }
       }
     },
-    [],
+    [scrollToFragment],
   )
 
   const loadBook = useCallback(
@@ -325,14 +363,28 @@ function App() {
         if (!viewerRef.current) {
           throw new Error('Reader container is not available.')
         }
-        const initialHref = nextChapters[0]?.href
 
-        if (initialHref) {
-          const initialKey = findChapterKey(initialHref, nextChapterIndex)
-          await renderChapter(initialHref, initialKey)
+        let rendered = false
+
+        for (const ch of nextChapters) {
+          if (!ch.href) continue
+          const [chapterHref, fragmentId] = ch.href.split('#')
+          const key = findChapterKey(ch.href, nextChapterIndex)
+          rendered = await renderChapter(chapterHref || ch.href, key, fragmentId)
+          if (rendered) break
         }
 
-        if (!initialHref && nextChapterIndex.items?.length) {
+        if (!rendered) {
+          const spineItems = await nextBook.loaded.spine.catch(() => [])
+          for (const item of spineItems) {
+            if (typeof item.href !== 'string' || item.href.length === 0) continue
+            const key = findChapterKey(item.href, nextChapterIndex)
+            rendered = await renderChapter(item.href, key)
+            if (rendered) break
+          }
+        }
+
+        if (!rendered && nextChapterIndex.items?.length) {
           setSelectedKey((nextChapterIndex.items[0] as { key: string }).key)
         }
       } catch (error) {
@@ -371,8 +423,8 @@ function App() {
     if (!href) {
       return
     }
-
-    void renderChapter(href, key)
+    const [chapterHref, fragmentId] = href.split('#')
+    void renderChapter(chapterHref || href, key, fragmentId)
   }
 
   useEffect(() => {
@@ -419,8 +471,11 @@ function App() {
 
       if (nextKey === selectedKey && fragmentId) {
         requestAnimationFrame(() => {
-          const element = mount.querySelector(`#${CSS.escape(fragmentId)}`)
-          element?.scrollIntoView({ block: 'start' })
+          if (scrollToFragment(fragmentId)) {
+            return
+          }
+
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
         })
 
         return
@@ -435,47 +490,35 @@ function App() {
     return () => {
       mount.removeEventListener('click', onLinkClick)
     }
-  }, [chapterIndex, renderChapter, selectedKey])
+  }, [chapterIndex, renderChapter, scrollToFragment, selectedKey])
 
   return (
-    <div className="reader-page">
-      <Card className="reader-menubar" aria-hidden="true" bordered={false}
-        extra={
-          <Upload {...uploadProps}>
-            <Button type="primary" size="large" className="reader-menubar__button">
-              Load EPUB
-            </Button>
-          </Upload>
-        }
-      >
-      </Card>
-
-      {errorMessage ? (
-        <Alert
-          className="reader-alert"
-          message="Could not load EPUB"
-          description={errorMessage}
-          type="error"
-          showIcon
-        />
-      ) : null}
-
       <Layout className="reader-layout">
         <Sider className="reader-sidebar" theme="light" aria-hidden="true" width={300}>
-          <div className="reader-sidebar__header">
-            <Title level={4}>Chapters</Title>
-            <Text type="secondary">
-              {chapters.length ? `${chapters.length} entries available` : 'Upload a book to see its contents'}
-            </Text>
+          <div className='reader-control' style={{display: 'flex', padding: '5px', justifyContent: 'end'}}>
+            <Upload {...uploadProps}>
+              <Button type="primary" size="medium" shape='square' className="reader-menubar__button">
+                Upload
+              </Button>
+            </Upload>
           </div>
-
           {chapters.length ? (
             <Menu
               mode="inline"
               items={chapterIndex.items}
               selectedKeys={selectedKey ? [selectedKey] : []}
               openKeys={openKeys}
-              onOpenChange={(keys) => setOpenKeys(keys)}
+              onOpenChange={(keys) => {
+                setOpenKeys(keys)
+                const newKey = keys.find((k) => !openKeys.includes(k))
+                if (newKey) {
+                  const href = chapterIndex.hrefByKey[newKey]
+                  if (href) {
+                    const [chapterHref, fragmentId] = href.split('#')
+                    void renderChapter(chapterHref || href, newKey, fragmentId)
+                  }
+                }
+              }}
               onClick={handleChapterClick}
               className="reader-menu"
             />
@@ -490,7 +533,16 @@ function App() {
         </Sider>
 
         <Content className="reader-content">
-          <Card className="reader-stage" bordered={false}>
+          <Card className="reader-stage " bordered={false}>
+            {errorMessage ? (
+              <Alert
+                className="reader-alert"
+                message="Could not load EPUB"
+                description={errorMessage}
+                type="error"
+                showIcon
+              />
+            ) : null}
             <div className={`reader-viewer ${isLoading ? 'reader-viewer--loading' : ''}`}>
               <div ref={viewerRef} className="reader-viewer__mount" />
 
@@ -514,7 +566,6 @@ function App() {
           </Card>
         </Content>
       </Layout>
-    </div>
   )
 }
 
