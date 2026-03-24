@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Repository guidance for coding agents working in `E:\_Repos\aebook`.
+Repository guidance for coding agents working in `E:\_Repos\epub-reading`.
 
 ## 1) Project Snapshot
 
@@ -12,7 +12,7 @@ Repository guidance for coding agents working in `E:\_Repos\aebook`.
 
 ## 2) Setup and Core Commands
 
-Run all commands from repository root: `E:\_Repos\aebook`.
+Run all commands from repository root: `E:\_Repos\epub-reading`.
 
 ### Install
 
