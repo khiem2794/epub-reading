@@ -15,7 +15,7 @@ import type { MenuProps, UploadProps } from 'antd'
 import './App.css'
 
 const { Content, Sider } = Layout
-const { Text, Title } = Typography
+const { Text } = Typography
 
 type ChapterNode = NavItem & {
   key: string

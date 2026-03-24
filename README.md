@@ -1,75 +1,60 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Epub reading app
 
-Currently, two official plugins are available:
+A EPUB reader built with React 19, TypeScript, Vite, and Ant Design.  
+This project allows users to upload and read EPUB files directly in the browser, with a clean interface and responsive design. Easy to use with browser read aloud feature in Edge,...
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **EPUB Upload & Parsing**: Upload `.epub` files and render their content instantly.
+- **Table of Contents Navigation**: Browse chapters via a sidebar menu.
+- **Internal Link Handling**: Clickable links within the book for seamless navigation.
+- **Resource Rewriting**: Images and media are loaded from the EPUB archive.
+- **Responsive UI**: Clean layout using Ant Design components.
+- **Graceful Error Handling**: User-friendly messages for unsupported or broken files.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+## Tech Stack
 
-Note: This will impact Vite dev & build performances.
+- **React 19** (functional components, hooks)
+- **TypeScript** (strict mode)
+- **Vite 8** (fast dev/build)
+- **Ant Design** (UI components)
+- **epubjs** (EPUB parsing/rendering)
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+pnpm install
+pnpm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Build
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+pnpm run build
 ```
+
+## Usage
+
+1. Click the **Upload** button in the sidebar.
+2. Select an `.epub` file from your computer.
+3. Navigate chapters using the sidebar menu.
+4. Click internal links to jump within the book.
+
+## Project Structure
+
+- `src/App.tsx` — Main application logic and UI
+- `src/main.tsx` — App entry point
+- `src/App.css` — App-specific styles
+- `public/` — Static assets
+
+## Notes
+
+- Only EPUB files are supported.
+- For best results, use a modern browser.
+
+## License
+
+MIT
