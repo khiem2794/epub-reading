@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Card,
+  Drawer,
   Empty,
   Layout,
   Menu,
@@ -11,6 +12,7 @@ import {
   Typography,
   Upload,
 } from 'antd'
+import { MenuOutlined } from '@ant-design/icons'
 import type { MenuProps, UploadProps } from 'antd'
 import './App.css'
 
@@ -191,7 +193,28 @@ async function buildFallbackChapters(book: Book): Promise<NavItem[]> {
   }, [])
 }
 
+const MOBILE_BREAKPOINT = '(max-width: 960px)'
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia(MOBILE_BREAKPOINT).matches,
+  )
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(MOBILE_BREAKPOINT)
+    const handler = (event: MediaQueryListEvent) => setIsMobile(event.matches)
+
+    mediaQuery.addEventListener('change', handler)
+    return () => mediaQuery.removeEventListener('change', handler)
+  }, [])
+
+  return isMobile
+}
+
 function App() {
+  const isMobile = useIsMobile()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
   const viewerRef = useRef<HTMLDivElement | null>(null)
   const bookRef = useRef<Book | null>(null)
   const activeSectionRef = useRef<{ unload: () => void } | null>(null)
@@ -425,6 +448,9 @@ function App() {
     }
     const [chapterHref, fragmentId] = href.split('#')
     void renderChapter(chapterHref || href, key, fragmentId)
+    if (isMobile) {
+      setDrawerOpen(false)
+    }
   }
 
   useEffect(() => {
@@ -492,80 +518,111 @@ function App() {
     }
   }, [chapterIndex, renderChapter, scrollToFragment, selectedKey])
 
-  return (
-      <Layout className="reader-layout">
-        <Sider className="reader-sidebar" theme="light" aria-hidden="true" width={300}>
-          <div className='reader-control' style={{display: 'flex', padding: '5px', justifyContent: 'end'}}>
-            <Upload {...uploadProps}>
-              <Button type="primary" size="medium" shape='square' className="reader-menubar__button">
-                Upload
-              </Button>
-            </Upload>
-          </div>
-          {chapters.length ? (
-            <Menu
-              mode="inline"
-              items={chapterIndex.items}
-              selectedKeys={selectedKey ? [selectedKey] : []}
-              openKeys={openKeys}
-              onOpenChange={(keys) => {
-                setOpenKeys(keys)
-                const newKey = keys.find((k) => !openKeys.includes(k))
-                if (newKey) {
-                  const href = chapterIndex.hrefByKey[newKey]
-                  if (href) {
-                    const [chapterHref, fragmentId] = href.split('#')
-                    void renderChapter(chapterHref || href, newKey, fragmentId)
-                  }
+  const sidebarContent = (
+    <>
+      <div className="reader-control" style={{ display: 'flex', padding: '5px', justifyContent: 'end' }}>
+        <Upload {...uploadProps}>
+          <Button type="primary" size="medium" shape="square" className="reader-menubar__button">
+            Upload
+          </Button>
+        </Upload>
+      </div>
+      {chapters.length ? (
+        <Menu
+          mode="inline"
+          items={chapterIndex.items}
+          selectedKeys={selectedKey ? [selectedKey] : []}
+          openKeys={openKeys}
+          onOpenChange={(keys) => {
+            setOpenKeys(keys)
+            const newKey = keys.find((k) => !openKeys.includes(k))
+            if (newKey) {
+              const href = chapterIndex.hrefByKey[newKey]
+              if (href) {
+                const [chapterHref, fragmentId] = href.split('#')
+                void renderChapter(chapterHref || href, newKey, fragmentId)
+                if (isMobile) {
+                  setDrawerOpen(false)
                 }
-              }}
-              onClick={handleChapterClick}
-              className="reader-menu"
-            />
-          ) : (
-            <div className="reader-sidebar__empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No table of contents yet"
-              />
-            </div>
-          )}
+              }
+            }
+          }}
+          onClick={handleChapterClick}
+          className="reader-menu"
+        />
+      ) : (
+        <div className="reader-sidebar__empty">
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No table of contents yet"
+          />
+        </div>
+      )}
+    </>
+  )
+
+  return (
+    <Layout className="reader-layout">
+      {isMobile ? (
+        <>
+          <Button
+            className="reader-hamburger"
+            type="text"
+            icon={<MenuOutlined />}
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open table of contents"
+          />
+          <Drawer
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            placement="left"
+            width={300}
+            className="reader-drawer"
+            styles={{ body: { padding: 0 } }}
+          >
+            {sidebarContent}
+          </Drawer>
+        </>
+      ) : (
+        <Sider className="reader-sidebar" theme="light" aria-hidden="true" width={300}>
+          {sidebarContent}
         </Sider>
+      )}
 
-        <Content className="reader-content">
-          <Card className="reader-stage " bordered={false}>
-            {errorMessage ? (
-              <Alert
-                className="reader-alert"
-                message="Could not load EPUB"
-                description={errorMessage}
-                type="error"
-                showIcon
-              />
+      <Content className="reader-content">
+        <Card className="reader-stage " bordered={false}>
+          {errorMessage ? (
+            <Alert
+              className="reader-alert"
+              message="Could not load EPUB"
+              description={errorMessage}
+              type="error"
+              showIcon
+            />
+          ) : null}
+          <div className={`reader-viewer ${isLoading ? 'reader-viewer--loading' : ''}`}>
+            <div ref={viewerRef} className="reader-viewer__mount" />
+
+            {!bookMeta && !isLoading ? (
+              <div className="reader-placeholder">
+                <Empty description="Upload an EPUB from the top menu to start reading" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              </div>
             ) : null}
-            <div className={`reader-viewer ${isLoading ? 'reader-viewer--loading' : ''}`}>
-              <div ref={viewerRef} className="reader-viewer__mount" />
 
-              {!bookMeta && !isLoading ? (
-                <div className="reader-placeholder">
-                  <Empty description="Upload an EPUB from the top menu to start reading" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                </div>
-              ) : null}
-
-              {isLoading ? (
-                <div className="reader-loading">
-                  <Card bordered={false}>
-                    <Space direction="vertical" size={8}>
-                      <Text strong>Opening {fileName || 'book'}...</Text>
-                      <Text type="secondary">Parsing the package, chapters, and reading order.</Text>
-                    </Space>
-                  </Card>
-                </div>
-              ) : null}
-            </div>
-          </Card>
-        </Content>
-      </Layout>
+            {isLoading ? (
+              <div className="reader-loading">
+                <Card bordered={false}>
+                  <Space direction="vertical" size={8}>
+                    <Text strong>Opening {fileName || 'book'}...</Text>
+                    <Text type="secondary">Parsing the package, chapters, and reading order.</Text>
+                  </Space>
+                </Card>
+              </div>
+            ) : null}
+          </div>
+        </Card>
+      </Content>
+    </Layout>
   )
 }
 
